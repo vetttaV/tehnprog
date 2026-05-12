@@ -1,0 +1,305 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Техническая спецификация: Система сетевого мониторинга</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600&display=swap');
+
+        body {
+            font-family: 'Onest', sans-serif;
+            line-height: 1.6;
+            color: #2d3748;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 30px;
+            background-color: #ffffff;
+        }
+
+        header {
+            margin-bottom: 40px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        h1 { font-weight: 600; font-size: 2.2rem; color: #1a202c; margin: 0; }
+        .subtitle { color: #718096; font-size: 1rem; margin-top: 5px; }
+
+        h2 { font-weight: 600; font-size: 1.6rem; margin-top: 40px; color: #2b6cb0; border-bottom: 1px solid #edf2f7; padding-bottom: 5px; }
+        h3 { font-weight: 600; font-size: 1.2rem; margin-top: 30px; color: #2d3748; }
+        h4 { font-weight: 600; font-size: 1.05rem; margin-top: 20px; color: #4a5568; }
+        
+        p { margin-bottom: 1rem; text-align: justify; }
+
+        .scheme-box {
+            background-color: #f8fafc;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 0.95rem;
+            color: #4a5568;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .api-item {
+            margin-bottom: 30px;
+            padding-left: 10px;
+        }
+
+        .signature {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #c53030;
+            font-size: 1rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 15px 0;
+        }
+
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #edf2f7;
+            font-size: 0.9rem;
+        }
+
+        th {
+            color: #4a5568;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .returns {
+            font-size: 0.9rem;
+            color: #276749;
+            margin-top: 5px;
+        }
+
+        .tag {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: white;
+            text-transform: uppercase;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .tag-cpp { background: #3182ce; }
+        .tag-py { background: #38a169; }
+        .tag-wrap { background: #805ad5; }
+        .tag-cmake { background: #4a5568; }
+
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #a0aec0;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Техническая спецификация программного комплекса</h1>
+    
+</header>
+
+<section>
+    <h2>1. Общая структурная схема и взаимодействие модулей</h2>
+    <p>Программный комплекс построен на основе многоуровневой архитектуры. Взаимодействие компонентов организовано в виде последовательной передачи данных от графического интерфейса пользователя к вычислительному ядру, с обеспечением строгой типизации и инкапсуляции на каждом уровне.</p>
+    
+    <div class="scheme-box">
+[ Уровень 1: Пользовательский интерфейс (PyQt5) ]
+       |  Сбор данных от пользователя, формирование запросов
+       v
+[ Уровень 2: Интеграционный слой (Python) ]
+       |  Загрузка Dylib, подготовка типов данных (ctypes)
+       v
+[ Уровень 3: Слой экспорта (C-Wrapper) ]
+       |  Предоставление C-API
+       v
+[ Уровень 4: Вычислительное ядро (C++) ]
+       |  Объектная модель сообщений, контроль интенсивности (Rate Limiting)
+[ База данных в оперативной памяти (std::vector, std::map) ]
+    </div>
+
+    <p><b>Логика взаимодействия:</b> Пользователь вводит параметры сетевого пакета через графический интерфейс. Эти данные передаются в класс-обертку на Python, который конвертирует строки в массивы символов и вызывает бинарные функции интерфейса. Функции экспорта создают объекты C++ и вызывают методы контроля лимитов в ядре. В случае успешного прохождения проверок сообщение сохраняется во внутренней структуре данных.</p>
+</section>
+
+<section>
+    <h2>2. Система сборки (CMake)</h2>
+    <p>Процесс компиляции ядра и слоя экспорта управляется кроссплатформенной системой сборки CMake.</p>
+    <div class="api-item">
+        <span class="tag tag-cmake">CMakeLists.txt</span>
+        <p>Файл конфигурации выполняет следующие задачи:</p>
+        <ul>
+            <li>Устанавливает минимальную требуемую версию CMake (3.10) и инициализирует проект <code>unicastmessage_lib</code>.</li>
+            <li>Определяет стандарт языка <b>C++11</b> (<code>CMAKE_CXX_STANDARD 11</code>).</li>
+            <li>Объединяет исходные файлы (<code>unicastmessage.cpp</code>, <code>wrapper.cpp</code>) и компилирует их в общую динамическую библиотеку (<code>SHARED</code>), готовую к загрузке интерпретатором Python.</li>
+            <li>Настраивает директории заголовочных файлов для корректной линковки.</li>
+        </ul>
+    </div>
+</section>
+
+<section>
+    <h2>3. Описание компонентов ядра (C++ Core)</h2>
+    <p>Ядро включает в себя базовые классы для представления сетевых пакетов и контроллер для управления ими.</p>
+
+    <h3>3.1. Класс NetworkMessage</h3>
+    <p>Абстрактный класс, определяющий базовый интерфейс сетевого сообщения.</p>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>NetworkMessage(double time, uint32_t sender, uint32_t len, string protocol)</span>
+        <p>Конструктор. Инициализирует основные атрибуты пакета.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>time</td><td>double</td><td>Метка времени (в секундах).</td></tr>
+            <tr><td>sender</td><td>uint32_t</td><td>IP-адрес отправителя в числовом виде.</td></tr>
+            <tr><td>len</td><td>uint32_t</td><td>Размер полезной нагрузки в байтах.</td></tr>
+            <tr><td>protocol</td><td>string</td><td>Имя протокола (TCP, UDP и т.д.).</td></tr>
+        </table>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>virtual bool isValid() const = 0</span>
+        <p>Абстрактный метод для проверки логической корректности пакета.</p>
+        <div class="returns"><b>Возвращает:</b> <code>bool</code> (true — данные валидны, false — ошибка).</div>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>Геттеры и Сеттеры</span>
+        <p>Методы <code>getRegistrationTime()</code>, <code>getSenderIP()</code>, <code>getLength()</code>, <code>getProtocolName()</code> возвращают соответствующие параметры. Сеттеры позволяют изменять эти поля.</p>
+        <div class="returns"><b>Возвращают:</b> Значения соответствующих внутренних переменных.</div>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>static uint32_t ipStringToUint(const string& ipStr)</span>
+        <p>Утилитарный метод для преобразования строкового IP в число.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>ipStr</td><td>string</td><td>Строка с IP-адресом.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>uint32_t</code> (числовое представление IP-адреса).</div>
+    </div>
+
+    <h3>2.2. Классы-наследники сообщений</h3>
+    <ul>
+        <li><b>UnicastMessage:</b> Реализует метод <code>isValid()</code>. Проверяет, что IP отправителя (<code>senderIP</code>) не равен IP получателя (<code>receiverIP</code>).</li>
+        <li><b>BroadcastMessage:</b> Содержит маску подсети (<code>subnetMask</code>). Метод <code>isValid()</code> проверяет корректность маски (отсутствие чередования нулей и единиц).</li>
+        <li><b>MulticastMessage:</b> Содержит идентификатор группы (<code>groupID</code>). Метод <code>isValid()</code> проверяет вхождение IP в мультикаст-диапазон (224.0.0.0 — 239.255.255.255).</li>
+    </ul>
+
+    <h3>3.3. Класс MessageRegister</h3>
+    <p>Главный контроллер, управляющий регистрацией пакетов и проверкой интенсивности.</p>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>bool checkSenderLimit(uint32_t senderIP, double currentTime)</span>
+        <p>Реализует алгоритм скользящего окна. Удаляет метки времени, выходящие за пределы окна, и проверяет количество оставшихся.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>senderIP</td><td>uint32_t</td><td>IP-адрес отправителя для проверки.</td></tr>
+            <tr><td>currentTime</td><td>double</td><td>Текущее системное время.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>bool</code> (true — лимит не превышен, false — превышен).</div>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>bool addUnicast(double time, const string& sender, const string& receiver, uint32_t length, const string& protocol)</span>
+        <p>Создает пакет, проверяет его валидность и пропускает через фильтр лимитов. Аналогично работают <code>addBroadcast</code> и <code>addMulticast</code>.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>time, length</td><td>double, uint32_t</td><td>Время и размер.</td></tr>
+            <tr><td>sender, receiver, protocol</td><td>string</td><td>Строковые параметры пакета.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>bool</code> (true — успешно добавлено, false — отклонено).</div>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-cpp">C++</span>void removeOldMessages(double olderThanTime)</span>
+        <p>Выполняет очистку оперативной памяти от сообщений, зарегистрированных ранее указанного времени.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>olderThanTime</td><td>double</td><td>Порог времени для удаления.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>void</code>.</div>
+    </div>
+</section>
+
+<section>
+    <h2>4. Слой экспорта (C-Wrapper)</h2>
+    <p>Функции, обеспечивающие бинарный интерфейс (ABI) для внешних сред.</p>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-wrap">C-API</span>void* messageregister_create_with_params(double window_sec, int limit_msgs)</span>
+        <p>Создает экземпляр регистратора.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>window_sec, limit_msgs</td><td>double, int</td><td>Параметры временного окна и максимального количества пакетов.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>void*</code> (непрозрачный указатель на объект).</div>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-wrap">C-API</span>int messageregister_add_unicast(void* register_ptr, double time, const char* sender, const char* receiver, uint32_t length, const char* protocol)</span>
+        <p>C-совместимая обертка для метода добавления сообщения.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>register_ptr</td><td>void*</td><td>Указатель на контроллер.</td></tr>
+            <tr><td>sender, receiver, protocol</td><td>const char*</td><td>C-строки.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>int</code> (1 — добавлено, 0 — ошибка).</div>
+    </div>
+</section>
+
+<section>
+    <h2>5. Высокоуровневый API и GUI (Python)</h2>
+
+    <h3>5.1. Класс MessageRegister (Python Wrapper)</h3>
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-py">Python</span>__init__(self, time_window, message_limit)</span>
+        <p>Загружает динамическую библиотеку (dylib), настраивает типы аргументов и инициализирует C++ объект.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>time_window, message_limit</td><td>float, int</td><td>Настройки лимитов.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> Экземпляр объекта.</div>
+    </div>
+
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-py">Python</span>add_unicast(self, time, sender, receiver, length, protocol)</span>
+        <p>Конвертирует Python-строки в байтовые массивы (ctypes) и вызывает C-функцию.</p>
+        <table>
+            <tr><th>Параметр</th><th>Тип</th><th>Назначение</th></tr>
+            <tr><td>sender, receiver, protocol</td><td>str</td><td>Данные пакета.</td></tr>
+            <tr><td>time, length</td><td>float, int</td><td>Числовые данные.</td></tr>
+        </table>
+        <div class="returns"><b>Возвращает:</b> <code>bool</code> (True или False).</div>
+    </div>
+
+    <h3>5.2. Графический интерфейс (MessageRegisterGUI)</h3>
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-py">GUI</span>add_unicast_msg(self)</span>
+        <p>Слот-обработчик кнопки. Считывает текст из полей QLineEdit, валидирует ввод и вызывает методы регистратора.</p>
+        <div class="returns"><b>Возвращает:</b> <code>None</code>.</div>
+    </div>
+    
+    <div class="api-item">
+        <span class="signature"><span class="tag tag-py">GUI</span>show_register(self)</span>
+        <p>Формирует текстовый отчет по всем зарегистрированным сообщениям и выводит его в информационное окно.</p>
+        <div class="returns"><b>Возвращает:</b> <code>None</code>.</div>
+    </div>
+</section>
+
+
+
+</body>
+</html>
